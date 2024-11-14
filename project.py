@@ -1,11 +1,11 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from bs4 import BeautifulSoup
+from selenium import webdriver  # type: ignore
+from selenium.webdriver.common.by import By  # type: ignore
+from selenium.webdriver.support.ui import WebDriverWait  # type: ignore
+from selenium.webdriver.support import expected_conditions as EC  # type: ignore
+from selenium.common.exceptions import TimeoutException  # type: ignore
+from bs4 import BeautifulSoup  # type: ignore
 import time
 import csv
-import json
 import os
 
 # List of URLs for each category
@@ -31,20 +31,19 @@ urls = [
 # Set up the WebDriver (make sure to have the ChromeDriver executable in your PATH)
 driver = webdriver.Chrome()
 
-# Dictionary to store the data by category
-category_data = {}
-
 # Loop through each URL to scrape data
 for url in urls:
     driver.get(url)
 
     # Wait for the product container to be present (adjust the locator as needed)
     try:
-        # Wait for the page to load completely by looking for a product container element
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, 'column.category-menu__menu-item'))
+        # Increase the wait time to ensure the content is fully loaded
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_all_elements_located((By.CLASS_NAME, 'column.category-menu__menu-item'))
         )
-    except TimeoutException:
+        # Add a short delay to ensure all data is fully loaded
+        time.sleep(5)
+    except TimeoutException:  # type: ignore
         print(f"Timeout waiting for {url}")
         continue
 
@@ -64,33 +63,32 @@ for url in urls:
     for product_div in product_divs:
         # Extract the item name from the h2 tag inside the current div
         item_name_tag = product_div.find('h2', {'data-test-id': 'ItemSelector'})
-        if item_name_tag:
-            item_name = item_name_tag.text.strip()
-        else:
-            item_name = "Item name not found"
+        item_name = item_name_tag.text.strip() if item_name_tag else "Item name not found"
 
-        # Extract the price from the span tag with class 'amount' inside the current div
+        # Clean up item_name to remove any double quotes
+        item_name = item_name.replace('"', '').replace(',', '')  # Remove double quotes and commas
+
+        # Extract the price from the span tag with class 'amount'
         price_tag = product_div.find('span', class_='amount')
-        if price_tag:
-            price = f"₱ {price_tag.text.strip()}"
-        else:
-            price = "Price not found"
+        price = f"{price_tag.text.strip()}" if price_tag else "Price not found"
 
-        # Add the item name and price to the products list
+        # Add the cleaned item name and price to the products list
         products.append({"item_name": item_name, "price": price})
-
-    # Store the products list in the dictionary under the category name
-    category_data[category_name] = products
 
     # Save the CSV file in the current working directory
     current_directory = os.getcwd()  # Get the current working directory
     file_name = f'{category_name.replace(" ", "_")}_menu.csv'
     file_path = os.path.join(current_directory, file_name)
 
-    # Write the category's data to a CSV file
+    # Write the category's data to a CSV file with no quotes around text
     with open(file_path, 'w', newline='', encoding='utf-8') as csv_file:
         fieldnames = ['item_name', 'price']
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer = csv.DictWriter(
+            csv_file,
+            fieldnames=fieldnames,
+            quotechar='"',
+            quoting=csv.QUOTE_NONE  # Disable automatic quoting
+        )
 
         # Write the header row
         writer.writeheader()
@@ -99,13 +97,7 @@ for url in urls:
         for product in products:
             writer.writerow(product)
 
+    print(f"Data for {category_name} saved to {file_name}")
+
 # Quit the driver
 driver.quit()
-
-# Output the results as a JSON file (for example)
-json_file_path = os.path.join(current_directory, 'menu_data.json')
-with open(json_file_path, 'w', encoding='utf-8') as json_file:
-    json.dump(category_data, json_file, ensure_ascii=False, indent=4)
-
-# Optionally, print the results to the console for verification
-print(json.dumps(category_data, ensure_ascii=False, indent=4))
