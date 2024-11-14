@@ -10,6 +10,7 @@ import os
 
 # List of URLs for each category
 urls = [
+    'https://www.jollibeedelivery.com/menu/best-sellers',
     'https://www.jollibeedelivery.com/menu/new-products',
     'https://www.jollibeedelivery.com/menu/family-meals',
     'https://www.jollibeedelivery.com/menu/breakfast',
@@ -25,7 +26,8 @@ urls = [
     'https://www.jollibeedelivery.com/menu/fries-and-sides',
     'https://www.jollibeedelivery.com/menu/mc-desserts',
     'https://www.jollibeedelivery.com/menu/beverages',
-    'https://www.jollibeedelivery.com/menu/jollibee-kids-meal'
+    'https://www.jollibeedelivery.com/menu/jollibee-kids-meal',
+    'https://www.jollibeedelivery.com/menu/meals-under-650-kcal-for-coke-stores'
 ]
 
 # Set up the WebDriver (make sure to have the ChromeDriver executable in your PATH)
@@ -33,54 +35,54 @@ driver = webdriver.Chrome()
 
 # Open a CSV file for writing
 current_directory = os.getcwd()  # Get the current working directory
-file_name = 'products_menu.csv'
+file_name = 'menu.csv'
 file_path = os.path.join(current_directory, file_name)
+
+# Use a set to store unique (item_name, price) pairs
+unique_products = set()
 
 with open(file_path, 'w', newline='', encoding='utf-8') as csv_file:
     writer = csv.writer(csv_file)
+    writer.writerow(['item_name', 'price'])  # Write the header row once
 
-    # Write the header row once
-    writer.writerow(['item_name', 'price'])
-
-    # Loop through each URL to scrape data
     for url in urls:
+        print(f"\nScraping: {url}...")
         driver.get(url)
 
-        # Wait for the product container to be present (adjust the locator as needed)
         try:
-            # Increase the wait time to ensure the content is fully loaded
-            WebDriverWait(driver, 30).until(
+            WebDriverWait(driver, 20).until(
                 EC.presence_of_all_elements_located((By.CLASS_NAME, 'column.category-menu__menu-item'))
             )
-            # Add a short delay to ensure all data is fully loaded
-            time.sleep(5)
-        except TimeoutException:  # type: ignore
+            time.sleep(2)
+        except TimeoutException:
             print(f"Timeout waiting for {url}")
             continue
 
         # Get the page source and parse it with BeautifulSoup
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-
-        # Extract all product containers (divs with class 'column category-menu__menu-item')
         product_divs = soup.find_all('div', class_='column category-menu__menu-item')
 
-        # Loop through each product div and extract item name and price
         for product_div in product_divs:
-            # Extract the item name from the h2 tag inside the current div
+            # Extract the item name and price
             item_name_tag = product_div.find('h2', {'data-test-id': 'ItemSelector'})
             item_name = item_name_tag.text.strip() if item_name_tag else "Item name not found"
-
-            # Clean up item_name to remove any double quotes
-            item_name = item_name.replace('"', '')  # Remove double quotes
-
-            # Extract the price from the span tag with class 'amount'
             price_tag = product_div.find('span', class_='amount')
             price = f"{price_tag.text.strip()}" if price_tag else "Price not found"
 
-            # Write the item name and price to the CSV file
-            writer.writerow([item_name, price])
+            # Highlight the item_name and price on the webpage using JavaScript
+            if item_name_tag:
+                driver.execute_script("arguments[0].style.backgroundColor = '#4682B4';", 
+                                      driver.find_element(By.XPATH, f"//*[text()='{item_name}']"))
+            if price_tag:
+                driver.execute_script("arguments[0].style.backgroundColor = '#5F9EA0';", 
+                                      driver.find_element(By.XPATH, f"//*[text()='{price_tag.text.strip()}']"))
+
+            if (item_name, price) not in unique_products:
+                unique_products.add((item_name, price))
+                writer.writerow([item_name, price])
+
+            time.sleep(0.3)  # Pause to see the highlight effect
 
     print(f"Data saved to {file_name}")
 
-# Quit the driver
 driver.quit()
