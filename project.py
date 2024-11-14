@@ -39,6 +39,9 @@ file_path = os.path.join(current_directory, file_name)
 with open(file_path, 'w', newline='', encoding='utf-8') as csv_file:
     writer = csv.writer(csv_file)
 
+    # Write the header row once
+    writer.writerow(['item_name', 'price'])
+
     # Loop through each URL to scrape data
     for url in urls:
         driver.get(url)
@@ -58,12 +61,6 @@ with open(file_path, 'w', newline='', encoding='utf-8') as csv_file:
         # Get the page source and parse it with BeautifulSoup
         soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-        # Extract the category name from the URL (this will be used as the key)
-        category_name = url.split('/')[-1].replace('-', ' ').title()
-
-        # Initialize a list to store the extracted products for this category
-        products = []
-
         # Extract all product containers (divs with class 'column category-menu__menu-item')
         product_divs = soup.find_all('div', class_='column category-menu__menu-item')
 
@@ -80,19 +77,8 @@ with open(file_path, 'w', newline='', encoding='utf-8') as csv_file:
             price_tag = product_div.find('span', class_='amount')
             price = f"{price_tag.text.strip()}" if price_tag else "Price not found"
 
-            # Add the cleaned item name and price to the products list
-            products.append({"item_name": item_name, "price": price})
-
-        # Write the category data to the CSV with a comment above each section
-        writer.writerow([f"# {category_name}"])
-        writer.writerow(['item_name', 'price'])  # Write the header row for this category
-
-        # Write the data rows for this category
-        for product in products:
-            writer.writerow([product['item_name'], product['price']])
-
-        # Add a blank row to separate categories
-        writer.writerow([])
+            # Write the item name and price to the CSV file
+            writer.writerow([item_name, price])
 
     print(f"Data saved to {file_name}")
 
