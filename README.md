@@ -1,2 +1,2 @@
-# OrderSaver-Cost-Optimization-for-Menus
+# Cost-Optimization-for-Menus
 save money when ordering
